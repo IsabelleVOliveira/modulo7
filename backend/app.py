@@ -1,86 +1,112 @@
 import os
-os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'  # Desabilita a otimização do TensorFlow em algumas configurações de hardware
-from fastapi import FastAPI  # Framework FastAPI para criação da API
-from tensorflow import keras  # Keras para trabalhar com modelos de machine learning
-import yfinance as yf  # Biblioteca para pegar dados financeiros
-from datetime import datetime  # Para registrar timestamps nos logs
-import numpy as np  # Para operações numéricas
-import pandas as pd  # Para manipulação de dados
-import json  # Para ler e gravar arquivos JSON
-import uvicorn  # Para rodar o servidor
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
+from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+from tensorflow import keras
+import yfinance as yf
+from datetime import datetime
+import numpy as np
+import pandas as pd
+import json
+import uvicorn
+import pickle
+from tinydb import TinyDB, Query
+from fastapi.middleware.cors import CORSMiddleware
+
+# Inicializa o TinyDB com o arquivo 'info_db.json'
+db = TinyDB('info_db.json')
 
 # Inicializa a aplicação FastAPI
 app = FastAPI()
 
-# Função para verificar e criar o arquivo JSON de normalização se ele não existir
-def check_and_create_info_json(coin: str):
-    if not os.path.exists('info.json'):
-        # Busca o histórico da criptomoeda usando a API yfinance
+# Habilita o CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://172.22.208.1:3000", "http://localhost:3000", "http://172.22.208.1:8000", "http://localhost:8000"],  # Endereço do frontend
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Montar a pasta de arquivos estáticos gerada pelo build do React
+app.mount("/static", StaticFiles(directory="C:\\Users\\Inteli\\Documents\\m7\\modulo7\\frontend\\ponderada\\build\\static"), name="static")
+
+# Função para verificar e criar os dados de normalização no TinyDB se não existirem
+def check_and_create_info_db(coin: str):
+    Coin = Query()
+    result = db.search(Coin.name == coin)
+
+    if not result:
+        print(f"{coin} não encontrado no banco, buscando dados do yfinance para criar...")
         ticker = yf.Ticker(coin)
-        # Você pode ajustar o período e o intervalo conforme necessário
-        df = ticker.history(period="1y", interval='1d')  # Histórico de 1 ano, diário
+        df = ticker.history(period="1y", interval='1d')
 
         if df.empty:
+            print("Erro: Nenhum dado retornado pelo yfinance")
             return {"error": "Failed to fetch data from yfinance"}
+        
+        print(f"Dados retornados do yfinance:\n{df.head()}")
 
-        # Calcula o valor mínimo e máximo da coluna 'Close' (preço de fechamento)
         min_value = df['Close'].min()
         max_value = df['Close'].max()
 
-        # Criação do arquivo de normalização com valores reais
-        info = {
-            coin: {
-                "min": float(min_value),  # Valor mínimo real do histórico
-                "max": float(max_value)   # Valor máximo real do histórico
-            }
-        }
+        print(f"Valor mínimo: {min_value}, Valor máximo: {max_value}")
 
-        # Escreve o arquivo JSON
-        with open('info.json', 'w') as outfile:
-            json.dump(info, outfile)
+        db.insert({
+            'name': coin,
+            'min': float(min_value),
+            'max': float(max_value)
+        })
+        print(f"Dados de normalização para {coin} inseridos com sucesso no TinyDB.")
         
-        return info
+        return {"min": float(min_value), "max": float(max_value)}
+
     else:
-        # Se o arquivo já existir, apenas lê o conteúdo
-        with open('info.json', 'r') as openfile:
-            info = json.load(openfile)
-        return info
+        print(f"Dados de normalização para {coin} já existem no TinyDB.")
+        return result[0]
 
 # Função para processar os dados da criptomoeda, normalizar e preparar para o modelo LSTM
 def process_data(coin: str):
     ticker = yf.Ticker(coin)
     df = ticker.history(period="1d", interval='1m')
+
+    if df.empty:
+        print(f"Error: No data fetched from yfinance for {coin}")
+        return {"error": f"No data fetched from yfinance for {coin}"}
+
     df = df.drop(columns=["Dividends", "Stock Splits", "High", "Low", "Open"])
     df = df.rename(columns={"Close": "Value"})
 
-    # Carrega informações de normalização de um arquivo JSON
-    try:
-        with open('info.json', 'r') as openfile:
-            info = json.load(openfile)
-    except FileNotFoundError:
-        return {"error": "info.json file not found"}
+    normalization_info = check_and_create_info_db(coin)
+    
+    if isinstance(normalization_info, dict) and "error" in normalization_info:
+        print(f"Error: {normalization_info['error']}")
+        return normalization_info
 
-    # Normaliza os valores da criptomoeda com base em min e max armazenados
     try:
-        df["Value"] = (df["Value"] - info[coin]["min"]) / (info[coin]["max"] - info[coin]["min"])
+        df["Value"] = (df["Value"] - normalization_info["min"]) / (normalization_info["max"] - normalization_info["min"])
     except KeyError:
-        return {"error": f"Normalization info for {coin} not found in info.json"}
+        print(f"Error: KeyError during normalization for {coin}")
+        return {"error": f"Normalization info for {coin} not found in TinyDB"}
 
     values = df["Value"].values.reshape(-1, 1)
 
-    # Seleciona os últimos 60 minutos para criar a sequência de entrada para o LSTM
     if len(values) < 60:
+        print("Error: Not enough data to create a 60-minute sequence")
         return {"error": "Not enough data to create a 60-minute sequence"}
-    
+
     x_p = np.array([values[-60 + i] for i in range(60)]).reshape(1, 60, 1)
     vol = df["Volume"].values[-1]
 
-    return [x_p, vol]
+    # Obtém os volumes recentes para passar ao comparator
+    recent_volumes = df["Volume"].values[-60:]  # Últimos 60 minutos de volume
 
+    return [x_p, vol, recent_volumes]
 
 # Função para comparar previsões e dar uma sugestão de compra, venda ou manutenção
 def comparator(arr: list, vol: int, recent_volumes: np.array):
-    avg_vol = np.mean(recent_volumes)  # Calcula a média do volume recente
+    avg_vol = np.mean(recent_volumes)
 
     if arr[0] > 0.1 and arr[1] > 0.1 and vol < 0.1 * avg_vol:
         return "Buy"
@@ -88,65 +114,78 @@ def comparator(arr: list, vol: int, recent_volumes: np.array):
         return "Sell"
     else:
         return "Hold"
-    
+
+# Função para carregar ou inicializar o arquivo de logs
+def load_logs():
+    try:
+        with open('logs.json', 'r') as openfile:
+            log = json.load(openfile)
+    except (FileNotFoundError, json.JSONDecodeError):
+        log = {"typeConsult": [], "date": []}
+        with open('logs.json', 'w') as outfile:
+            json.dump(log, outfile)
+    return log
+
+# Função para salvar logs
+def save_logs(log):
+    with open('logs.json', 'w') as outfile:
+        json.dump(log, outfile)
+
 @app.get("/")
 def read_root():
     return {"Hello": "World"}
 
-# Endpoint para prever a tendência da Dogecoin
 @app.get("/doge")
 def predictDOGE():
-    # Log da consulta
-    try:
-        with open('logs.json', 'r') as openfile:
-            log = json.load(openfile)
-    except FileNotFoundError:
-        log = {"typeConsult": [], "date": []}
+    normalization_info = check_and_create_info_db("DOGE-USD")
     
+    if isinstance(normalization_info, dict) and "error" in normalization_info:
+        return normalization_info
+
+    log = load_logs()
+
     log["typeConsult"].append("Predicao Dogecoin")
     log["date"].append(datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
     
-    with open('logs.json', 'w') as outfile:
-        json.dump(log, outfile)
+    save_logs(log)
 
-    # Carrega o modelo LSTM para Dogecoin
+    model_path = "model_lstm.pkl"
+
     try:
-        model = keras.models.load_model("models/DOGE-USD-LSTM.h5")
-        print("Model loaded successfully")
+        with open(model_path, 'rb') as model_file:
+            model = pickle.load(model_file)
+        print("Modelo carregado com sucesso")
     except OSError as e:
-        print("Failed to load model")
-        return {"error": "Failed to load model", "message": str(e)}
-    
-    data = process_data("DOGE-USD")
-    if isinstance(data, dict) and "error" in data:
-        return data
-    
-    X, vol = data
-    y = model.predict(X)
+        return {"error": "Falha ao carregar o modelo", "message": str(e)}
 
-    # Calcula a diferença entre o valor real e a previsão
-    delta = [(X[0][-1][0] - X[0][-2][0]) * 10, (X[0][-1][0] - y[0][0]) * 10]
+    try:
+        data = process_data("DOGE-USD")
+        if isinstance(data, dict) and "error" in data:
+            return data
+    except Exception as e:
+        return {"error": "Falha no processamento de dados", "message": str(e)}
 
-    return comparator(delta, vol)
+    try:
+        X, vol, recent_volumes = data
+        y = model.predict(X)
+        delta = [(X[0][-1][0] - X[0][-2][0]) * 10, (X[0][-1][0] - y[0][0]) * 10]
+    except Exception as e:
+        return {"error": "Falha na previsão", "message": str(e)}
 
+    try:
+        return comparator(delta, vol, recent_volumes)
+    except Exception as e:
+        return {"error": "Falha na comparação", "message": str(e)}
 
-# Endpoint para obter o histórico recente de Dogecoin
 @app.get("/hist_doge")
 def histDOGE():
-    # Log da consulta de histórico
-    try:
-        with open('logs.json', 'r') as openfile:
-            log = json.load(openfile)
-    except FileNotFoundError:
-        log = {"typeConsult": [], "date": []}
-    
+    log = load_logs()
+
     log["typeConsult"].append("Historico Dogecoin")
     log["date"].append(datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
     
-    with open('logs.json', 'w') as outfile:
-        json.dump(log, outfile)
+    save_logs(log)
 
-    # Obtém os dados históricos de Dogecoin
     ticker = yf.Ticker("DOGE-USD")
     df = ticker.history(period="5d", interval='1m')
     df = df.drop(columns=["Dividends", "Stock Splits", "High", "Low", "Open", "Volume"])
@@ -158,25 +197,21 @@ def histDOGE():
 
     return parsed
 
-
-# Endpoint para visualizar os logs de consultas
 @app.get("/logs")
 def logs():
-    # Carrega o arquivo de logs
-    try:
-        with open('logs.json', 'r') as openfile:
-            logT = json.load(openfile)
-    except FileNotFoundError:
-        return {"error": "logs.json file not found"}
-
-    # Atualiza o log com a nova consulta
-    logT["typeConsult"].append("Logs")
-    logT["date"].append(datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
+    log = load_logs()
     
-    with open('logs.json', 'w') as outfile:
-        json.dump(logT, outfile)
+    log["typeConsult"].append("Logs")
+    log["date"].append(datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
+    
+    save_logs(log)
 
-    return logT
+    return log
 
-if __name__ == "_main_":
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+# Função para servir o arquivo index.html para qualquer rota desconhecida
+@app.get("/{full_path:path}")
+async def serve_react_app(full_path: str):
+    return FileResponse("C:\\Users\\Inteli\\Documents\\m7\\modulo7\\frontend\\ponderada\\build\\index.html")
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000)
