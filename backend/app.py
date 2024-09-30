@@ -197,26 +197,6 @@ def predictDOGE():
     except Exception as e:
         return {"error": "Falha na comparação", "message": str(e)}
 
-@app.get("/hist_doge")
-def histDOGE():
-    log = load_logs()
-
-    log["typeConsult"].append("Historico Dogecoin")
-    log["date"].append(datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
-    
-    save_logs(log)
-
-    ticker = yf.Ticker("DOGE-USD")
-    df = ticker.history(period="5d", interval='1m')
-    df = df.drop(columns=["Dividends", "Stock Splits", "High", "Low", "Open", "Volume"])
-    df = df.rename(columns={"Close": "Value"})
-    df.index = df.index.strftime("%d/%m/%Y %H:%M:%S")
-    
-    j = df.to_json(orient='index')
-    parsed = json.loads(j)
-
-    return parsed
-
 @app.get("/logs")
 def logs():
     log = load_logs()
