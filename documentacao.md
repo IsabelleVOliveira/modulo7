@@ -10,15 +10,18 @@ Para este projeto, foram criadas duas imagens de Docker, juntamente com um arqui
 
 # Execução do projeto
 
-Para executar o projeto, o usuario deve clonar o respositorio do projeto com o seguinte comando: `git clone https://github.com/IsabelleVOliveira/modulo7.git`
+Para executar o projeto, o usuário deve clonar o repositório do projeto com o seguinte comando: `git clone https://github.com/IsabelleVOliveira/modulo7.git`
 
-Depois de garanit rque o repositorio foi clonado para sua maquina, o usuario deve apenas executar o comando ``docker compose up --build``
 
-Depois disso, ousuario deve acessar o seu navegador e acessar o localhost de seu computador pela URL na porta 7000.
+Depois de garantir que o repositório foi clonado para sua máquina, o usuário deve apenas executar o comando: 
+`docker compose up --build`
 
-Ao acessar a interface, o usuario deve receber informações sobre as previsões do modelo em relação ao valor da criptomoeda DogeCoin, logo a baixo, informações sobre o que deve fazer no momento sobre compra e venda da moeda e por ultimo, no final da tela se encontram as informações de Logs, dos usuarios do sistema e quais foram suas ações enquanto usava a aplicação.
 
-É importante notar que sempre que a pagina for atualizada, os dados nelas tbm serão, o que garante grande precisão sobre a qualidade dos dados obtidos pe API e maior precisão em relação as previsões do modelo criado.
+Após isso, o usuário deve acessar o seu navegador e acessar o localhost de seu computador pela URL na porta 7000.
+
+Ao acessar a interface, o usuário deve receber informações sobre as previsões do modelo em relação ao valor da criptomoeda DogeCoin. Logo abaixo, haverá informações sobre o que fazer no momento em relação à compra e venda da moeda. Por último, no final da tela, estão as informações de logs dos usuários do sistema e quais foram suas ações enquanto utilizavam a aplicação.
+
+É importante notar que sempre que a página for atualizada, os dados nela também serão, o que garante grande precisão sobre a qualidade dos dados obtidos pela API e maior precisão em relação às previsões do modelo criado.
 
 # Backend e TinyDB
 
@@ -49,3 +52,7 @@ A decisão de não utilizar um data lake neste projeto se baseia em consideraç�
  - Retorna as previsões desnormalizadas para os próximos 7 dias.
 
  Essas rotas permitem que o frontend se comunique com o backend, fornecendo dados em tempo real, históricos e previsões sobre o Dogecoin, além de registrar as consultas realizadas.
+
+ # Retreino do modelo
+
+ Para realizar um novo treinamento do modelo com um conjunto de dados mais atualizado, é necessário executar o notebook `criacaoModelo.ipynb`. Como os dados são obtidos por meio de uma API atualizada em tempo real, sempre que esse notebook for executado, é garantido que os dados utilizados serão sempre os mais atuais.
