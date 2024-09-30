@@ -23,14 +23,12 @@ app = FastAPI()
 # Habilita o CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://172.22.208.1:3000", "http://localhost:3000", "http://172.22.208.1:8000", "http://localhost:8000"],  # Endereço do frontend
+    allow_origins=["http://172.22.208.1:3000", "http://localhost:3000", "http://172.22.208.1:7000", "http://localhost:7000"],  # Endereço do frontend
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Montar a pasta de arquivos estáticos gerada pelo build do React
-app.mount("/static", StaticFiles(directory="C:\\Users\\Inteli\\Documents\\m7\\modulo7\\frontend\\ponderada\\build\\static"), name="static")
 
 # Função para verificar e criar os dados de normalização no TinyDB se não existirem
 def check_and_create_info_db(coin: str):
@@ -69,12 +67,31 @@ def check_and_create_info_db(coin: str):
 # Função para processar os dados da criptomoeda, normalizar e preparar para o modelo LSTM
 def process_data(coin: str):
     ticker = yf.Ticker(coin)
-    df = ticker.history(period="1d", interval='1m')
+    
+    # Tenta primeiro com 7 dias
+    df = ticker.history(period="7d", interval='1m')
 
+    # Se os dados estiverem vazios, tenta com 5 dias
+    if df.empty:
+        print("Error: No data for 7 days. Trying 5 days...")
+        df = ticker.history(period="5d", interval='1m')
+
+    # Se ainda estiver vazio, tenta com 1 dia
+    if df.empty:
+        print("Error: No data for 5 days. Trying 1 day...")
+        df = ticker.history(period="1d", interval='1m')
+
+    # Se os dados ainda estiverem vazios, retorna um erro
     if df.empty:
         print(f"Error: No data fetched from yfinance for {coin}")
         return {"error": f"No data fetched from yfinance for {coin}"}
 
+    # Verifica se há dados suficientes (60 minutos)
+    if len(df) < 60:
+        print(f"Error: Not enough data fetched for {coin}. Only {len(df)} minutes available.")
+        return {"error": f"Not enough data fetched for {coin}. Only {len(df)} minutes available."}
+
+    # Processa os dados normalmente após garantir que eles foram obtidos
     df = df.drop(columns=["Dividends", "Stock Splits", "High", "Low", "Open"])
     df = df.rename(columns={"Close": "Value"})
 
@@ -92,10 +109,12 @@ def process_data(coin: str):
 
     values = df["Value"].values.reshape(-1, 1)
 
+    # Verifica novamente se existem dados suficientes para criar a sequência de 60 minutos
     if len(values) < 60:
         print("Error: Not enough data to create a 60-minute sequence")
         return {"error": "Not enough data to create a 60-minute sequence"}
 
+    # Cria a sequência de 60 minutos
     x_p = np.array([values[-60 + i] for i in range(60)]).reshape(1, 60, 1)
     vol = df["Volume"].values[-1]
 
@@ -103,6 +122,7 @@ def process_data(coin: str):
     recent_volumes = df["Volume"].values[-60:]  # Últimos 60 minutos de volume
 
     return [x_p, vol, recent_volumes]
+
 
 # Função para comparar previsões e dar uma sugestão de compra, venda ou manutenção
 def comparator(arr: list, vol: int, recent_volumes: np.array):
@@ -207,11 +227,6 @@ def logs():
     save_logs(log)
 
     return log
-
-# Função para servir o arquivo index.html para qualquer rota desconhecida
-@app.get("/{full_path:path}")
-async def serve_react_app(full_path: str):
-    return FileResponse("C:\\Users\\Inteli\\Documents\\m7\\modulo7\\frontend\\ponderada\\build\\index.html")
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

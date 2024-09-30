@@ -1,5 +1,5 @@
 # Use uma imagem Python
-FROM python:3.10-slim
+FROM python:3.11
 
 # Defina o diretório de trabalho
 WORKDIR /app
@@ -17,4 +17,5 @@ COPY . .
 EXPOSE 8000
 
 # Comando para rodar o FastAPI com Uvicorn
-CMD ["uvicorn", "app:app", "--host", "localhost", "--port", "8000"]
+# CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python", "app.py"]
