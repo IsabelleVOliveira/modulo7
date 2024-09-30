@@ -8,6 +8,8 @@ O modelo escolhido para realizar o treinamento do modelo desse projeto foi o LST
 
 Para este projeto, foram criadas duas imagens de Docker, juntamente com um arquivo docker-compose.yml para orquestrar a execução do projeto e garantir um bom desempenho em qualquer dispositivo. A separação da execução do projeto em duas imagens de Docker permite a promoção de uma arquitetura limpa, possibilitando que cada componente seja desenvolvido, testado e escalado de forma independente, facilitando a manutenção e atualização sem impactar o outro. Além disso, a utilização do Docker assegura um ambiente de execução consistente em diferentes máquinas, eliminando problemas de "funciona na minha máquina" e promovendo uma melhor integração entre desenvolvedores e equipes de operações. Por fim, o Docker Compose simplifica a configuração e a orquestração dos contêineres, permitindo uma fácil definição e gerenciamento das interações entre os serviços, incluindo rede e volumes. Essa abordagem otimiza a implementação e o escalonamento em ambientes de produção, uma vez que a contêinerização permite a rápida replicação e o gerenciamento eficiente de recursos em nuvem, aumentando a eficácia do sistema, o que pode até reduzir os custos do projeto.
 
+Vídeo de funcionamento do projeto: [Vídeo no YouTube](https://youtu.be/3oJpZ8vf8SI)
+
 # Execução do projeto
 
 Para executar o projeto, o usuário deve clonar o repositório do projeto com o seguinte comando: `git clone https://github.com/IsabelleVOliveira/modulo7.git`
