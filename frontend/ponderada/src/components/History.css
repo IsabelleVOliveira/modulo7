@@ -1,0 +1,12 @@
+.prediction-result {
+  margin-top: 20px;
+  text-align: center;
+}
+
+.prediction-result h2 {
+  font-size: 2rem;
+}
+
+.prediction-result p {
+  font-size: 1.5rem;
+}

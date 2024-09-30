@@ -23,7 +23,7 @@ app = FastAPI()
 # Habilita o CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://172.22.208.1:3000", "http://localhost:3000", "http://172.22.208.1:7000", "http://localhost:7000"],  # Endereço do frontend
+    allow_origins=["http://172.22.208.1:3000", "http://localhost:3000", "http://localhost:7000"],  # Endereço do frontend
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -129,11 +129,11 @@ def comparator(arr: list, vol: int, recent_volumes: np.array):
     avg_vol = np.mean(recent_volumes)
 
     if arr[0] > 0.1 and arr[1] > 0.1 and vol < 0.1 * avg_vol:
-        return "Buy"
+        return "Compre"
     elif arr[0] < -0.1 and arr[1] < -0.1 and vol < 0.2 * avg_vol:
-        return "Sell"
+        return "Venda"
     else:
-        return "Hold"
+        return "Mantenha se já possuir"
 
 # Função para carregar ou inicializar o arquivo de logs
 def load_logs():
@@ -227,6 +227,62 @@ def logs():
     save_logs(log)
 
     return log
+
+@app.get("/doge_forecast_7days")
+def predictDOGE7Days():
+    normalization_info = check_and_create_info_db("DOGE-USD")
+
+    if isinstance(normalization_info, dict) and "error" in normalization_info:
+        return normalization_info
+
+    log = load_logs()
+
+    log["typeConsult"].append("Previsão 7 Dias Dogecoin")
+    log["date"].append(datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
+
+    save_logs(log)
+
+    model_path = "model_lstm.pkl"
+
+    try:
+        with open(model_path, 'rb') as model_file:
+            model = pickle.load(model_file)
+        print("Modelo carregado com sucesso")
+    except OSError as e:
+        return {"error": "Falha ao carregar o modelo", "message": str(e)}
+
+    try:
+        data = process_data("DOGE-USD")
+        if isinstance(data, dict) and "error" in data:
+            return data
+    except Exception as e:
+        return {"error": "Falha no processamento de dados", "message": str(e)}
+
+    try:
+        X, vol, recent_volumes = data
+        # Gerar previsão para os próximos 7 dias
+        predictions = []
+        for _ in range(7):
+            # Prever o próximo valor
+            y_pred = model.predict(X)
+            predictions.append(y_pred[0][0])
+            
+            # Atualizar os dados de entrada para incluir a previsão mais recente
+            # Certifique-se de que y_pred seja reshaped corretamente
+            y_pred_reshaped = np.reshape(y_pred, (1, 1, 1))  # (batch_size, time_steps, features)
+            X = np.append(X[:, 1:, :], y_pred_reshaped, axis=1)
+
+        # Fazer a desnormalização para retornar os valores na escala original
+        min_val = normalization_info["min"]
+        max_val = normalization_info["max"]
+        predictions_desnormalized = [(pred * (max_val - min_val)) + min_val for pred in predictions]
+
+        # Retornar as previsões para os próximos 7 dias
+        return {"forecast_7_days": predictions_desnormalized}
+    
+    except Exception as e:
+        return {"error": "Falha na previsão", "message": str(e)}
+
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

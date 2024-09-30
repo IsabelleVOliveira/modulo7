@@ -1,0 +1,27 @@
+.prediction-container {
+    margin: 20px;
+    padding: 20px;
+    border: 1px solid #ddd; /* Borda leve para separar da seção */
+    border-radius: 8px; /* Bordas arredondadas */
+    background-color: #f9f9f9; /* Cor de fundo leve */
+    text-align: center; /* Centraliza o texto */
+  }
+  
+  .prediction-title {
+    font-size: 2rem; /* Tamanho do título */
+    margin-bottom: 10px; /* Espaçamento abaixo do título */
+    color: #333; /* Cor do título */
+  }
+  
+  .prediction-result {
+    font-size: 1.5rem; /* Tamanho do texto da previsão */
+    font-weight: bold; /* Negrito para destaque */
+    color: #4caf50; /* Cor verde para a previsão de compra */
+  }
+  
+  .prediction-recommendation {
+    font-size: 1.5rem; /* Tamanho do texto da recomendação */
+    font-weight: bold; /* Negrito para destaque */
+    color: #2196f3; /* Cor azul para a recomendação */
+  }
+  
