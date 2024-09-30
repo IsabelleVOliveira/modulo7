@@ -53,6 +53,12 @@ A decisão de não utilizar um data lake neste projeto se baseia em consideraç�
 
  Essas rotas permitem que o frontend se comunique com o backend, fornecendo dados em tempo real, históricos e previsões sobre o Dogecoin, além de registrar as consultas realizadas.
 
+ # Frontend
+
+O frontend foi desenvolvido usando React.js e CSS para estilização. Além disso, o axios foi utilizado para realizar a integração das rotas do backend com os componentes do frontend.
+
+No frontend, são exibidas informações sobre as previsões realizadas pelo modelo sobre o valor do Dogecoin nos próximos 7 dias por meio de um gráfico de linhas. Além disso, o usuário recebe recomendações de compra, venda ou, caso já possua a criptomoeda, de manutenção do ativo. Para o gerenciamento de logs do sistema, também são exibidas na interface as últimas rotas acessadas pelo usuário.
+
  # Retreino do modelo
 
  Para realizar um novo treinamento do modelo com um conjunto de dados mais atualizado, é necessário executar o notebook `criacaoModelo.ipynb`. Como os dados são obtidos por meio de uma API atualizada em tempo real, sempre que esse notebook for executado, é garantido que os dados utilizados serão sempre os mais atuais.
